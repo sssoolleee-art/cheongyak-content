@@ -1,0 +1,29 @@
+name: 매일 청약 일정 갱신
+
+on:
+  schedule:
+    - cron: '0 21 * * *' # 매일 오전 6시 KST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 수집
+        env:
+          ODCLOUD_KEY: ${{ secrets.ODCLOUD_KEY }}
+        run: node scripts/fetch.mjs
+      - name: 커밋
+        run: |
+          git config user.name "cheongyak-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "chore: 청약 일정 갱신 ($(date +%Y-%m-%d))"
+          git push
