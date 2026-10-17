@@ -20,6 +20,10 @@ jobs:
         env:
           ODCLOUD_KEY: ${{ secrets.ODCLOUD_KEY }}
         run: node scripts/fetch.mjs
+      - name: 주변 실거래가
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: node scripts/market.mjs
       - name: 커밋
         run: |
           git config user.name "cheongyak-bot"
