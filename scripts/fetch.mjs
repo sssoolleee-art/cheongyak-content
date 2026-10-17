@@ -42,6 +42,14 @@ async function all(op, cond) {
 }
 
 const pick = (...v) => v.find((x) => x) ?? null;
+// 오퍼레이션마다 날짜 형식이 달라(2026-10-01 / 20261001) YYYY-MM-DD 로 통일
+const day = (v) => {
+  if (!v) return null;
+  const s = String(v).trim();
+  if (/^\d{8}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : null;
+};
+const range = (a, b) => [day(a), day(b)];
 
 function normalize(k, r) {
   return {
@@ -53,13 +61,13 @@ function normalize(k, r) {
     region: r.SUBSCRPT_AREA_CODE_NM ?? '기타',
     address: r.HSSPLY_ADRES ?? '',
     units: r.TOT_SUPLY_HSHLDCO ?? null,
-    notice: r.RCRIT_PBLANC_DE ?? null,
-    special: [r.SPSPLY_RCEPT_BGNDE ?? null, r.SPSPLY_RCEPT_ENDDE ?? null],
-    rank1: [pick(r.GNRL_RNK1_CRSPAREA_RCPTDE, r.GNRL_RCEPT_BGNDE), pick(r.GNRL_RNK1_ETC_AREA_ENDDE, r.GNRL_RNK1_CRSPAREA_ENDDE, r.GNRL_RCEPT_ENDDE)],
-    rank2: [r.GNRL_RNK2_CRSPAREA_RCPTDE ?? null, pick(r.GNRL_RNK2_ETC_AREA_ENDDE, r.GNRL_RNK2_CRSPAREA_ENDDE)],
-    receipt: [pick(r.RCEPT_BGNDE, r.SUBSCRPT_RCEPT_BGNDE, r.SPSPLY_RCEPT_BGNDE, r.GNRL_RCEPT_BGNDE), pick(r.RCEPT_ENDDE, r.SUBSCRPT_RCEPT_ENDDE, r.GNRL_RCEPT_ENDDE)],
-    winner: r.PRZWNER_PRESNATN_DE ?? null,
-    contract: [r.CNTRCT_CNCLS_BGNDE ?? null, r.CNTRCT_CNCLS_ENDDE ?? null],
+    notice: day(r.RCRIT_PBLANC_DE),
+    special: range(r.SPSPLY_RCEPT_BGNDE, r.SPSPLY_RCEPT_ENDDE),
+    rank1: range(pick(r.GNRL_RNK1_CRSPAREA_RCPTDE, r.GNRL_RCEPT_BGNDE), pick(r.GNRL_RNK1_ETC_AREA_ENDDE, r.GNRL_RNK1_CRSPAREA_ENDDE, r.GNRL_RCEPT_ENDDE)),
+    rank2: range(r.GNRL_RNK2_CRSPAREA_RCPTDE, pick(r.GNRL_RNK2_ETC_AREA_ENDDE, r.GNRL_RNK2_CRSPAREA_ENDDE)),
+    receipt: range(pick(r.RCEPT_BGNDE, r.SUBSCRPT_RCEPT_BGNDE, r.SPSPLY_RCEPT_BGNDE, r.GNRL_RCEPT_BGNDE), pick(r.RCEPT_ENDDE, r.SUBSCRPT_RCEPT_ENDDE, r.GNRL_RCEPT_ENDDE)),
+    winner: day(r.PRZWNER_PRESNATN_DE),
+    contract: range(r.CNTRCT_CNCLS_BGNDE, r.CNTRCT_CNCLS_ENDDE),
     moveIn: r.MVN_PREARNGE_YM ?? null,
     builder: r.CNSTRCT_ENTRPS_NM ?? null,
     developer: r.BSNS_MBY_NM ?? null,
@@ -74,7 +82,8 @@ function normalize(k, r) {
 const items = [];
 for (const k of KINDS) {
   const rows = await all(k.detail, { 'cond[RCRIT_PBLANC_DE::GTE]': since });
-  for (const r of rows) items.push(normalize(k, r));
+  // 날짜 형식이 달라 서버 필터가 안 먹는 오퍼레이션이 있어, 정규화 후 한 번 더 거름
+  for (const r of rows) { const it = normalize(k, r); if ((it.notice ?? it.receipt[0] ?? '') >= since) items.push(it); }
   console.log(k.kind, rows.length);
 }
 
